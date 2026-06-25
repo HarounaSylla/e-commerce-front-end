@@ -1,0 +1,91 @@
+import { apiGet, apiPost, apiPut } from "@/lib/api";
+import {
+  type Product,
+  type Category,
+  type CreateCategoryBody,
+  type CreateProductBody,
+  type UpdateCategoryBody,
+  type UpdateProductBody,
+} from "./types";
+
+// category related API calls
+export async function getAdminCategories() {
+  return apiGet<Category[]>("/admin/categories");
+}
+
+export async function createAdminCategory(body: CreateCategoryBody) {
+  return apiPost<Category, CreateCategoryBody>("/admin/categories", body);
+}
+
+export async function updateAdminCategory(
+  categoryId: string,
+  body: UpdateCategoryBody
+) {
+  return apiPut<Category, UpdateCategoryBody>(
+    `/admin/categories/${categoryId}`,
+    body
+  );
+}
+
+// product related API calls
+
+export async function getAdminProducts(search?: string) {
+  const query = search?.trim()
+    ? `/admin/products?search=${encodeURIComponent(search.trim())}`
+    : "/admin/products";
+
+  return apiGet<Product[]>(query);
+}
+
+export async function getAdminProductById(productId: string) {
+  return apiGet<Product>(`/admin/products/${productId}`);
+}
+
+function buildProductFormData(
+  body: CreateProductBody | UpdateProductBody,
+  files: File[]
+): FormData {
+  const formData = new FormData();
+
+  formData.append("title", body.title);
+  formData.append("description", body.description);
+  formData.append("category", body.category);
+  formData.append("brand", body.brand);
+  formData.append("price", body.price.toString());
+  formData.append("salePercentage", body.salePercentage.toString());
+  formData.append("stock", body.stock.toString());
+  formData.append("status", body.status);
+
+  body.colors.forEach((color) => formData.append("colors", color));
+  body.sizes.forEach((size) => formData.append("sizes", size));
+
+  if ("existingImages" in body && body.existingImages) {
+    formData.append("existingImages", JSON.stringify(body.existingImages));
+  }
+  if ("coverImagePublicId" in body && body.coverImagePublicId) {
+    formData.append("coverImagePublicId", body.coverImagePublicId);
+  }
+
+  files.forEach((file) => formData.append("images", file));
+
+  return formData;
+}
+
+export async function createAdminProduct(
+  body: CreateProductBody,
+  file: File[]
+) {
+  const formData = buildProductFormData(body, file);
+
+  return apiPost<Product, FormData>("/admin/products", formData);
+}
+
+export async function updateAdminProduct(
+  productId: string,
+  body: UpdateProductBody,
+  file: File[]
+) {
+  const formData = buildProductFormData(body, file);
+
+  return apiPut<Product, FormData>(`/admin/products/${productId}`, formData);
+}
