@@ -1,4 +1,3 @@
-
 import {
   BadgePercent,
   BarChart3,
@@ -21,7 +20,7 @@ type AdminNavItem = {
 const items: AdminNavItem[] = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { label: "Products", href: "/admin/products", icon: Package },
-  { label: "Coupons", href: "/admin/coupons", icon: BadgePercent },
+  { label: "Coupons", href: "/admin/promos", icon: BadgePercent },
   { label: "Orders", href: "/admin/orders", icon: BarChart3 },
   { label: "Settings", href: "/admin/settings", icon: Settings2 },
 ];
@@ -42,39 +41,46 @@ const activeItem = "bg-sidebar-primary text-sidebar-primary-foreground";
 const idleItem =
   "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 
-
 function SidebarNave() {
-
-    return <nav className={navWrap}>
-        {
-            items.map((item) => {
-                const Icon = item.icon;
-                const link = (
-                    <NavLink to={item.href} className={({isActive}) => `${navItemDesktop} ${isActive ? activeItem : idleItem}`}
-                    key= {item.label} end={item.href === "/admin"}>
-                        <Icon className="h-[18px] w-[18px]" />
-                        <span>{item.label}</span>
-                    </NavLink>
-                )
-                return link;
-            })
-        }
-    </nav>      
+  return (
+    <nav className={navWrap}>
+      {items.map((item) => {
+        const Icon = item.icon;
+        const link = (
+          <NavLink
+            to={item.href}
+            className={({ isActive }) =>
+              `${navItemDesktop} ${isActive ? activeItem : idleItem}`
+            }
+            key={item.label}
+            end={item.href === "/admin"}
+          >
+            <Icon className="h-[18px] w-[18px]" />
+            <span>{item.label}</span>
+          </NavLink>
+        );
+        return link;
+      })}
+    </nav>
+  );
 }
 
 export function AdminSidebar() {
-return (
+  return (
     <aside className={sidebarRoot}>
-        <div className={brandRow}>
-            <div className="flex items-center gap-3">
-                <Store className="h-10 w-10" />
-                <span className="text-[25px] font-semibold text-foreground"> Roune's Store </span>
-            </div>
+      <div className={brandRow}>
+        <div className="flex items-center gap-3">
+          <Store className="h-10 w-10" />
+          <span className="text-[25px] font-semibold text-foreground">
+            {" "}
+            Roune's Store{" "}
+          </span>
         </div>
+      </div>
 
-        <div className="flex-1 overflow-y-auto">
-            <SidebarNave/>
-        </div>
+      <div className="flex-1 overflow-y-auto">
+        <SidebarNave />
+      </div>
     </aside>
-);
+  );
 }
