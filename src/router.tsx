@@ -4,7 +4,6 @@ import { StoreHome } from "./pages/customer/Home";
 import { PublicOnlyLayout } from "./components/auth/PublicOnlyLayout";
 import { SignIn, SignUp } from "@clerk/react";
 import { ProtectedOnlyLayout } from "./components/auth/ProtectedLayout";
-import { CustomerProfile } from "./pages/customer/Profile";
 import { RoleGuardLayout } from "./components/auth/RoleGuardLayout";
 import { AdminLayout } from "./components/layout/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -12,6 +11,9 @@ import AdminProducts from "./pages/admin/Products";
 import AdminPromos from "./pages/admin/Promos";
 import AdminOrders from "./pages/admin/Orders";
 import Adminsettings from "./pages/admin/Settings";
+import Collections from "./pages/customer/Collections";
+import CollectionsDetails from "./pages/customer/Collections-Details";
+import CustomerOrderSuccessPage from "./pages/customer/Order-success";
 
 export const router = createBrowserRouter([
   {
@@ -33,14 +35,22 @@ export const router = createBrowserRouter([
             path: "sign-up/*",
             element: <SignUp />,
           },
+          {
+            path: "collections",
+            element: <Collections />,
+          },
+          {
+            path: "collection/:id",
+            element: <CollectionsDetails />,
+          },
         ],
       },
       {
         element: <ProtectedOnlyLayout />,
         children: [
           {
-            path: "profile",
-            element: <CustomerProfile />,
+            path: "order-success",
+            element: <CustomerOrderSuccessPage />,
           },
         ],
       },
