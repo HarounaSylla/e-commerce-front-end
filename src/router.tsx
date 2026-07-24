@@ -2,7 +2,8 @@ import { createBrowserRouter } from "react-router-dom";
 import { CustomerLayout } from "./components/layout/CustomerLayout";
 import { StoreHome } from "./pages/customer/Home";
 import { PublicOnlyLayout } from "./components/auth/PublicOnlyLayout";
-import { SignIn, SignUp } from "@clerk/react";
+import { SignInPage } from "./pages/auth/sign-in";
+import { SignUpPage } from "./pages/auth/sign-up";
 import { ProtectedOnlyLayout } from "./components/auth/ProtectedLayout";
 import { RoleGuardLayout } from "./components/auth/RoleGuardLayout";
 import { AdminLayout } from "./components/layout/AdminLayout";
@@ -29,11 +30,11 @@ export const router = createBrowserRouter([
         children: [
           {
             path: "sign-in/*",
-            element: <SignIn />,
+            element: <SignInPage />,
           },
           {
             path: "sign-up/*",
-            element: <SignUp />,
+            element: <SignUpPage />,
           },
           {
             path: "collections",

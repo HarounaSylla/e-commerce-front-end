@@ -49,7 +49,9 @@ function CollectionDetails() {
     addToCart,
   } = useCustomerProductDetailsStore((state) => state);
 
-  const wishlistItems = useCustomerWishlistStore((state) => state.items);
+  const { items: wishlistItems, removeItem } = useCustomerWishlistStore(
+    (state) => state
+  );
 
   const product = data?.product ?? null;
   const relatedProducts = data?.relatedProducts ?? [];
@@ -107,9 +109,10 @@ function CollectionDetails() {
               )
             }
             isWishlistActive={isWishlistActive}
-            onAddToCart={() =>
-              addToCart(isLoaded, isBootstrapped, Boolean(isSignedIn))
-            }
+            onAddToCart={async () => {
+              addToCart(isLoaded, isBootstrapped, Boolean(isSignedIn));
+              removeItem(product._id);
+            }}
           />
         </div>
 

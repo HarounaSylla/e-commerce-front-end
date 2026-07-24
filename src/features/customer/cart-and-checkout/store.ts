@@ -11,7 +11,6 @@ import type {
 import {
   addCustomerCartItem,
   applyCustomerPromo,
-  confirmCheckout,
   createCheckoutSession,
   decreaseCustomerCartItem,
   getCheckoutData,
@@ -27,13 +26,6 @@ type AddCartItemInput = AddCustomerCartItemBody & {
   brand: string;
   image: string;
   finalPrice: number;
-};
-
-type RazorpayArgs = {
-  isSignedIn: boolean;
-  name: string;
-  email: string;
-  onSuccess: () => void;
 };
 
 type PointsArgs = {
@@ -70,9 +62,12 @@ type CustomerCartAndCheckoutStore = {
     isSignedIn: boolean
   ) => Promise<void>;
   setPromoInput: (value: string) => void;
+  setStripeClientSecret: (value: string) => void;
   clearPromo: () => void;
   applyPromo: () => Promise<void>;
-  startRazorpayCheckout: (args: RazorpayArgs) => Promise<void>;
+  stripeClientSecret: string;
+  startStripeCheckout: () => Promise<void>;
+  clearStripeCheckout: () => void;
   startPointsCheckout: (args: PointsArgs) => Promise<void>;
   clear: () => void;
 };
@@ -92,38 +87,15 @@ const defaultUiState = {
   promoLoading: false,
   checkoutLoading: false,
   pointsCheckoutLoading: false,
+  stripeClientSecret: "",
 };
-
-function waitForRazorpay(timeOut = 4000): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.Razorpay) {
-      resolve();
-      return;
-    }
-
-    const start = Date.now();
-
-    const interval = window.setInterval(() => {
-      if (window.Razorpay) {
-        window.clearInterval(interval);
-        resolve();
-        return;
-      }
-
-      if (Date.now() - start > timeOut) {
-        window.clearInterval(interval);
-        reject(new Error("Razorpay not loaded"));
-      }
-    }, 30);
-  });
-}
 
 // helpers
 
 const GUEST_CART_KEY = "guest_cart_items";
 
 function readGuestItems(): GuestCartItem[] {
-  if (typeof window === undefined) return [];
+  if (typeof window === "undefined") return [];
 
   try {
     const items = JSON.parse(
@@ -142,13 +114,13 @@ function readGuestItems(): GuestCartItem[] {
 }
 
 function writeGuestItems(items: GuestCartItem[]) {
-  if (typeof window === undefined) return;
+  if (typeof window === "undefined") return;
 
   window.localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
 }
 
 function clearGuestItems() {
-  if (typeof window === undefined) return;
+  if (typeof window === "undefined") return;
   window.localStorage.removeItem(GUEST_CART_KEY);
 }
 
@@ -357,6 +329,7 @@ export const useCustomerCartAndCheckoutStore =
       }
     },
     setPromoInput: (value) => set({ promoInput: value }),
+    setStripeClientSecret: (value) => set({ stripeClientSecret: value }),
     clearPromo: () => set({ promoInput: "", appliedPromo: null }),
     applyPromo: async () => {
       const { promoInput, cart } = get();
@@ -402,13 +375,8 @@ export const useCustomerCartAndCheckoutStore =
         ...defaultUiState,
       }),
 
-    startRazorpayCheckout: async ({ isSignedIn, name, email, onSuccess }) => {
+    startStripeCheckout: async () => {
       const { selectedAddressId, appliedPromo, cart } = get();
-
-      if (!isSignedIn) {
-        toast.error("sign in to checkout");
-        return;
-      }
 
       if (!selectedAddressId) {
         toast.error("Add a default address from profile section");
@@ -428,67 +396,20 @@ export const useCustomerCartAndCheckoutStore =
           promoCode: appliedPromo?.code || undefined,
         });
 
-        if (
-          !session.razorpay?.keyId ||
-          !session.razorpay.orderId ||
-          !session.order._id
-        ) {
+        if (!session?.stripe?.clientSecret) {
           throw new Error("Invalid checkout session");
         }
 
-        //load the razorpay instance
-
-        await waitForRazorpay();
-
-        if (!window.Razorpay) {
-          throw new Error("Razorpay not loaded");
-        }
-        const razorpay = new window.Razorpay({
-          key: session.razorpay.keyId,
-          amount: session.razorpay.amount,
-          currency: session.razorpay.currency,
-          order_id: session.razorpay.orderId,
-          name: "Monster E-commerce",
-          description: "Order payment",
-          prefill: { name, email },
-          handler: async (response) => {
-            try {
-              const confirmed = await confirmCheckout({
-                orderId: session.order._id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-              });
-              if (!confirmed._id) {
-                throw new Error("Order confirmation failed");
-              }
-
-              set({
-                cart: emptyCart,
-                isOpen: false,
-                ...defaultUiState,
-              });
-
-              toast.success("Payment successfull");
-              onSuccess();
-            } catch {
-              set({ checkoutLoading: false });
-              toast.error("Payment confirmation failed");
-            }
-          },
-
-          modal: {
-            ondismiss: () => set({ checkoutLoading: false }),
-          },
+        set({
+          checkoutLoading: false,
+          stripeClientSecret: session.stripe.clientSecret,
         });
-
-        razorpay.open();
       } catch {
         set({ checkoutLoading: false });
         toast.error("Unable to start checkout");
       }
     },
-
+    clearStripeCheckout: () => set({ stripeClientSecret: "" }),
     startPointsCheckout: async ({ isSignedIn, onSuccess }) => {
       const { selectedAddressId, appliedPromo, points, cart } = get();
 

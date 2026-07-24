@@ -42,11 +42,9 @@ export type AppliedPromo = {
 };
 
 export type CheckoutSessionResponse = {
-  razorpay: {
-    keyId: string;
-    orderId: string;
-    amount: number;
-    currency: string;
+  stripe: {
+    sessionId: string;
+    clientSecret: string;
   };
   order: {
     _id: string;
@@ -54,10 +52,6 @@ export type CheckoutSessionResponse = {
     discountAmount: number;
     totalAmount: number;
   };
-};
-
-export type CheckoutConfirmResponse = {
-  _id: string;
 };
 
 export type CheckoutPointsResponse = {

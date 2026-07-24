@@ -2,7 +2,6 @@ import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import type {
   AddCustomerCartItemBody,
   AppliedPromo,
-  CheckoutConfirmResponse,
   CheckoutDataResponse,
   CheckoutPayWithPointsResponse,
   CheckoutPointsResponse,
@@ -118,18 +117,6 @@ export async function payWithPointsCheckout(body: {
 }) {
   return apiPost<CheckoutPayWithPointsResponse, typeof body>(
     "/customer/checkout/pay-with-points",
-    body
-  );
-}
-
-export async function confirmCheckout(body: {
-  orderId: string;
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
-}) {
-  return apiPost<CheckoutConfirmResponse, typeof body>(
-    "/customer/checkout/confirm",
     body
   );
 }

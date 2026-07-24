@@ -9,12 +9,20 @@ import { useCustomerCartAndCheckoutStore } from "@/features/customer/cart-and-ch
 import CustomerCartItems from "./customer-cart-items";
 import { useEffect } from "react";
 import { useAuthStore } from "@/features/auth/store";
-import { useAuth, useUser } from "@clerk/react";
+import { useAuth } from "@clerk/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
+import { env } from "@/lib/env";
 import { useNavigate } from "react-router-dom";
+import { loadStripe } from "@stripe/stripe-js";
+import {
+  EmbeddedCheckoutProvider,
+  EmbeddedCheckout,
+} from "@stripe/react-stripe-js";
+
+const stripePromise = loadStripe(env.stripePublishableKey);
 
 const contentClass =
   "ml-auto flex h-[90dvh] max-h-[90dvh] w-full overflow-hidden rounded-none border-l border-border bg-background p-0";
@@ -28,10 +36,11 @@ const rightInnerClass = "flex h-full min-h-0 flex-col p-5";
 
 const panelClass =
   "flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm";
-const panelHeaderClass = "border-b border-border px-5 py-4";
+const panelHeaderClass = "shrink-0 border-b border-border px-5 py-4";
 const panelTitleClass = "flex items-center gap-2 text-left";
 
 const scrollClass = "min-h-0 flex-1";
+const scrollablePaneClass = "min-h-0 flex-1 overflow-y-auto overscroll-y-contain";
 const bodyClass = "space-y-4 px-5 py-4";
 
 const sectionTitleClass = "text-sm font-medium text-foreground";
@@ -53,6 +62,8 @@ const promoTitle =
 const infoBoxClass =
   "rounded-2xl border border-dashed border-border bg-background/70 p-4 text-sm text-muted-foreground";
 
+const stripeCheckoutWrapClass = "w-full pb-4";
+
 function SummaryRow(props: { label: string; value: string | number }) {
   return (
     <div className={rowClass}>
@@ -65,7 +76,6 @@ function SummaryRow(props: { label: string; value: string | number }) {
 function CustomerCartAndCheckoutDrawer() {
   const { isBootstrapped } = useAuthStore();
   const { isLoaded, isSignedIn } = useAuth();
-  const { user } = useUser();
   const navigate = useNavigate();
   const {
     isOpen,
@@ -82,11 +92,20 @@ function CustomerCartAndCheckoutDrawer() {
     setPromoInput,
     clearPromo,
     applyPromo,
-    startRazorpayCheckout,
+    stripeClientSecret,
+    startStripeCheckout,
+    clearStripeCheckout,
     startPointsCheckout,
+    clear,
     loading,
     cart,
   } = useCustomerCartAndCheckoutStore((state) => state);
+
+  useEffect(() => {
+    if (!isOpen) {
+      clearStripeCheckout();
+    }
+  }, [isOpen, clearStripeCheckout]);
 
   useEffect(() => {
     if (!isOpen || !isLoaded || !isBootstrapped) return;
@@ -108,150 +127,181 @@ function CustomerCartAndCheckoutDrawer() {
 
   const totalAmount = Math.max(subTotal - discountAmount, 0);
 
+  const handleStripeComplete = () => {
+    clear();
+    clearStripeCheckout();
+    navigate("/order-success");
+  };
+
   return (
     <Drawer open={isOpen} onOpenChange={setOpen}>
       <DrawerContent className={contentClass}>
         <div className={shellClass}>
-          <div className={leftPaneClass}>
-            <CustomerCartItems />
-          </div>
+          {!stripeClientSecret ? (
+            <div className={leftPaneClass}>
+              <CustomerCartItems />
+            </div>
+          ) : null}
           <aside className={rightPaneClass}>
             <div className={rightInnerClass}>
               <div className={panelClass}>
                 <DrawerHeader className={panelHeaderClass}>
                   <DrawerTitle className={panelTitleClass}>
-                    Checkout
+                    {stripeClientSecret ? "Payment" : "Checkout"}
                   </DrawerTitle>
                 </DrawerHeader>
 
                 {isSignedIn ? (
                   <>
-                    <ScrollArea className={scrollClass}>
-                      <div className={bodyClass}>
-                        <section className="space-y-2">
-                          <p className={sectionTitleClass}>Default Address</p>
+                    {!stripeClientSecret ? (
+                      <ScrollArea className={scrollClass}>
+                        <div className={bodyClass}>
+                          <section className="space-y-2">
+                            <p className={sectionTitleClass}>Default Address</p>
 
-                          {selectedAddress ? (
-                            <div className={cardClass}>
-                              <p className={helperClass}>
-                                {selectedAddress.fullName}
+                            {selectedAddress ? (
+                              <div className={cardClass}>
+                                <p className={helperClass}>
+                                  {selectedAddress.fullName}
+                                </p>
+                                <p className={helperClass}>
+                                  {selectedAddress.address}
+                                  {selectedAddress.state}
+                                </p>
+                                <p className={helperClass}>
+                                  {selectedAddress.postalCode}
+                                </p>
+                              </div>
+                            ) : (
+                              <p>
+                                No default address present. Add one from profile
+                                dialog
                               </p>
-                              <p className={helperClass}>
-                                {selectedAddress.address}
-                                {selectedAddress.state}
-                              </p>
-                              <p className={helperClass}>
-                                {selectedAddress.postalCode}
-                              </p>
-                            </div>
-                          ) : (
-                            <p>
-                              No default address present. Add one from profile
-                              dialog
-                            </p>
-                          )}
-                        </section>
+                            )}
+                          </section>
 
-                        <section className="space-y-2">
-                          <p className={promoTitle}>Promo Code</p>
-                          {!appliedPromo ? (
-                            <div className={promoRowClass}>
-                              <Input
-                                value={promoInput}
-                                onChange={(event) =>
-                                  setPromoInput(event.target.value)
-                                }
-                                placeholder="Enter Promo Code"
-                                className={promoInputClass}
-                              />
-                              <Button
-                                type="button"
-                                variant={"default"}
-                                onClick={() => void applyPromo()}
-                                disabled={promoLoading || !promoInput.trim()}
-                              >
-                                {promoLoading ? "Applying..." : "Apply"}
-                              </Button>
-                            </div>
-                          ) : (
-                            <div>
-                              <span>
-                                {appliedPromo.code} ({appliedPromo.percentage}%)
-                              </span>
-                              <Button
-                                type="button"
-                                variant={"default"}
-                                onClick={clearPromo}
-                              >
-                                Remove
-                              </Button>
-                            </div>
-                          )}
-                        </section>
-                        <SummaryRow label="Items" value={cart.totalQuantity} />
-                        <SummaryRow label="Subtotal" value={subTotal} />
-                        <SummaryRow
-                          label="Discount"
-                          value={formatPrice(discountAmount)}
-                        />
-                        <SummaryRow label="Points" value={points} />
-                        <div className={totalRowClass}>
-                          <span>Total</span>
-                          <span>{formatPrice(totalAmount)}</span>
+                          <section className="space-y-2">
+                            <p className={promoTitle}>Promo Code</p>
+                            {!appliedPromo ? (
+                              <div className={promoRowClass}>
+                                <Input
+                                  value={promoInput}
+                                  onChange={(event) =>
+                                    setPromoInput(event.target.value)
+                                  }
+                                  placeholder="Enter Promo Code"
+                                  className={promoInputClass}
+                                />
+                                <Button
+                                  type="button"
+                                  variant={"default"}
+                                  onClick={() => void applyPromo()}
+                                  disabled={promoLoading || !promoInput.trim()}
+                                >
+                                  {promoLoading ? "Applying..." : "Apply"}
+                                </Button>
+                              </div>
+                            ) : (
+                              <div>
+                                <span>
+                                  {appliedPromo.code} ({appliedPromo.percentage}
+                                  %)
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant={"default"}
+                                  onClick={clearPromo}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            )}
+                          </section>
+                          <SummaryRow label="Items" value={cart.totalQuantity} />
+                          <SummaryRow label="Subtotal" value={subTotal} />
+                          <SummaryRow
+                            label="Discount"
+                            value={formatPrice(discountAmount)}
+                          />
+                          <SummaryRow label="Points" value={points} />
+                          <div className={totalRowClass}>
+                            <span>Total</span>
+                            <span>{formatPrice(totalAmount)}</span>
+                          </div>
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <div className={scrollablePaneClass}>
+                        <div className={`${bodyClass} ${stripeCheckoutWrapClass}`}>
+                          <EmbeddedCheckoutProvider
+                            key={stripeClientSecret}
+                            stripe={stripePromise}
+                            options={{
+                              clientSecret: stripeClientSecret,
+                              onComplete: handleStripeComplete,
+                            }}
+                          >
+                            <EmbeddedCheckout className="w-full" />
+                          </EmbeddedCheckoutProvider>
                         </div>
                       </div>
-                    </ScrollArea>
+                    )}
 
                     <DrawerFooter className={actionClass}>
-                      <Button
-                        onClick={() => {
-                          void setOpen(false);
-                          void startRazorpayCheckout({
-                            isSignedIn: Boolean(isSignedIn),
-                            name: user?.fullName || "Customer",
-                            email:
-                              user?.primaryEmailAddress?.emailAddress || "",
-                            onSuccess: () => navigate("/order-success"),
-                          });
-                        }}
-                        type="button"
-                        className={primaryButtonClass}
-                        disabled={
-                          loading ||
-                          !cart.items.length ||
-                          !selectedAddressId ||
-                          checkoutLoading ||
-                          pointsCheckoutLoading
-                        }
-                      >
-                        {checkoutLoading
-                          ? "Processing..."
-                          : "Pay with Razorpay"}
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          void startPointsCheckout({
-                            isSignedIn: Boolean(isSignedIn),
-                            onSuccess: () => navigate("/order-success"),
-                          });
-                        }}
-                        disabled={
-                          !(
-                            Boolean(isSignedIn) &&
-                            Boolean(selectedAddressId) &&
-                            Boolean(cart.items.length) &&
-                            points >= totalAmount &&
-                            !checkoutLoading &&
-                            !pointsCheckoutLoading
-                          )
-                        }
-                        type="button"
-                        className={primaryButtonClass}
-                      >
-                        {pointsCheckoutLoading
-                          ? "Processing..."
-                          : "Pay with Points"}
-                      </Button>
+                      {stripeClientSecret ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={secondaryButtonClass}
+                          onClick={clearStripeCheckout}
+                        >
+                          Back to summary
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            onClick={() => void startStripeCheckout()}
+                            type="button"
+                            className={primaryButtonClass}
+                            disabled={
+                              loading ||
+                              !cart.items.length ||
+                              !selectedAddressId ||
+                              checkoutLoading ||
+                              pointsCheckoutLoading ||
+                              !env.stripePublishableKey
+                            }
+                          >
+                            {checkoutLoading
+                              ? "Processing..."
+                              : "Continue to payment"}
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              void startPointsCheckout({
+                                isSignedIn: Boolean(isSignedIn),
+                                onSuccess: () => navigate("/order-success"),
+                              });
+                            }}
+                            disabled={
+                              !(
+                                Boolean(isSignedIn) &&
+                                Boolean(selectedAddressId) &&
+                                Boolean(cart.items.length) &&
+                                points >= totalAmount &&
+                                !checkoutLoading &&
+                                !pointsCheckoutLoading
+                              )
+                            }
+                            type="button"
+                            className={primaryButtonClass}
+                          >
+                            {pointsCheckoutLoading
+                              ? "Processing..."
+                              : "Pay with Points"}
+                          </Button>
+                        </>
+                      )}
                     </DrawerFooter>
                   </>
                 ) : (
